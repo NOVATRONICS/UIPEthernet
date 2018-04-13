@@ -83,6 +83,7 @@ int
 UIPUDP::beginPacket(IPAddress ip, uint16_t port)
 {
   UIPEthernetClass::tick();
+
   if (ip && port)
     {
       uip_ipaddr_t ripaddr;
@@ -205,6 +206,8 @@ int
 UIPUDP::parsePacket()
 {
   UIPEthernetClass::tick();
+  //UIPEthernet.maintain();
+
 #ifdef UIPETHERNET_DEBUG_UDP
   if (appdata.packet_in != NOBLOCK)
     {
