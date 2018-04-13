@@ -122,18 +122,18 @@ enum
 
 typedef struct _RIP_MSG_FIXED
 {
-	uint8_t  op; 
-	uint8_t  htype; 
-	uint8_t  hlen;
-	uint8_t  hops;
-	uint32_t xid;
-	uint16_t secs;
-	uint16_t flags;
-	uint8_t  ciaddr[4];
-	uint8_t  yiaddr[4];
-	uint8_t  siaddr[4];
-	uint8_t  giaddr[4];
-	uint8_t  chaddr[6];
+  uint8_t  op; 
+  uint8_t  htype; 
+  uint8_t  hlen;
+  uint8_t  hops;
+  uint32_t xid;
+  uint16_t secs;
+  uint16_t flags;
+  uint8_t  ciaddr[4];
+  uint8_t  yiaddr[4];
+  uint8_t  siaddr[4];
+  uint8_t  giaddr[4];
+  uint8_t  chaddr[6];
 }RIP_MSG_FIXED;
 
 class DhcpClass {
@@ -146,6 +146,7 @@ private:
   uint8_t  _dhcpGatewayIp[4];
   uint8_t  _dhcpDhcpServerIp[4];
   uint8_t  _dhcpDnsServerIp[4];
+  uint8_t  _dhcpOpts[256];
   uint32_t _dhcpLeaseTime;
   uint32_t _dhcpT1, _dhcpT2;
   signed long _renewInSec;

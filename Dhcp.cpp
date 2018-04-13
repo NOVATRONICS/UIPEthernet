@@ -58,18 +58,21 @@ int DhcpClass::request_DHCP_lease(){
     {
         if(_dhcp_state == STATE_DHCP_START)
         {
+            Serial.println("STATE_DHCP_START");
             _dhcpTransactionId++;
             
             send_DHCP_MESSAGE(DHCP_DISCOVER, ((millis() - startTime) / 1000));
             _dhcp_state = STATE_DHCP_DISCOVER;
         }
         else if(_dhcp_state == STATE_DHCP_REREQUEST){
+            Serial.println("STATE_DHCP_REREQUEST");
             _dhcpTransactionId++;
             send_DHCP_MESSAGE(DHCP_REQUEST, ((millis() - startTime)/1000));
             _dhcp_state = STATE_DHCP_REQUEST;
         }
         else if(_dhcp_state == STATE_DHCP_DISCOVER)
         {
+            Serial.println("STATE_DHCP_DISCOVER");
             uint32_t respId;
             messageType = parseDHCPResponse(_responseTimeout, respId);
             if(messageType == DHCP_OFFER)
@@ -83,6 +86,7 @@ int DhcpClass::request_DHCP_lease(){
         }
         else if(_dhcp_state == STATE_DHCP_REQUEST)
         {
+            Serial.println("STATE_DHCP_REQUEST");
             uint32_t respId;
             messageType = parseDHCPResponse(_responseTimeout, respId);
             if(messageType == DHCP_ACK)
@@ -251,22 +255,36 @@ void DhcpClass::send_DHCP_MESSAGE(uint8_t messageType, uint16_t secondsElapsed)
 uint8_t DhcpClass::parseDHCPResponse(unsigned long responseTimeout, uint32_t& transactionId)
 {
     uint8_t type = 0;
+    uint8_t dhcpOption = 0;
     uint8_t opt_len = 0;
-     
     unsigned long startTime = millis();
 
+    uint8_t *fixedMsgPtr;
+    
     while(_dhcpUdpSocket.parsePacket() <= 0)
     {
         if((millis() - startTime) > responseTimeout)
         {
+            Serial.println("!parseDHCPResponse type: 255");
             return 255;
         }
         delay(50);
     }
+
     // start reading in the packet
     RIP_MSG_FIXED fixedMsg;
     _dhcpUdpSocket.read((uint8_t*)&fixedMsg, sizeof(RIP_MSG_FIXED));
-  
+/*
+    opt_len = sizeof(RIP_MSG_FIXED);
+    Serial.print("RIP_MSG_FIXED: size ");
+    Serial.println(opt_len);
+    fixedMsgPtr = (uint8_t*)&fixedMsg;
+    while (opt_len--) {
+        Serial.print(*fixedMsgPtr++);
+        Serial.print(" ");    
+    }
+    Serial.println("");    
+*/
     if(fixedMsg.op == DHCP_BOOTREPLY && _dhcpUdpSocket.remotePort() == DHCP_SERVER_PORT)
     {
         transactionId = ntohl(fixedMsg.xid);
@@ -274,11 +292,22 @@ uint8_t DhcpClass::parseDHCPResponse(unsigned long responseTimeout, uint32_t& tr
         {
             // Need to read the rest of the packet here regardless
             _dhcpUdpSocket.flush();
+            Serial.println("!parseDHCPResponse type: 0");
             return 0;
         }
 
         memcpy(_dhcpLocalIp, fixedMsg.yiaddr, 4);
-
+        /*
+        opt_len = 4;
+        fixedMsgPtr = (uint8_t*)_dhcpLocalIp;
+        Serial.print("LocalIp: ");
+        while (opt_len--){
+            Serial.print(*fixedMsgPtr++);
+            if(opt_len>0)
+                Serial.print(".");
+            else 
+                Serial.println("");    
+        }*/
         // Skip to the option part
         // Doing this a byte at a time so we don't have to put a big buffer
         // on the stack (as we don't have lots of memory lying around)
@@ -287,95 +316,186 @@ uint8_t DhcpClass::parseDHCPResponse(unsigned long responseTimeout, uint32_t& tr
             _dhcpUdpSocket.read(); // we don't care about the returned byte
         }
 
-        while (_dhcpUdpSocket.available() > 0) 
+        while (_dhcpUdpSocket.available() > 0 && dhcpOption!=endOption) 
         {
-            switch (_dhcpUdpSocket.read()) 
+            dhcpOption = _dhcpUdpSocket.read();
+            //Serial.print("dhcpOption ");
+            //Serial.println(dhcpOption);            
+            switch (dhcpOption) 
             {
                 case endOption :
-                    break;
-                    
+                    break;                    
                 case padOption :
-                    break;
-                
+                    break;                
                 case dhcpMessageType :
                     opt_len = _dhcpUdpSocket.read();
+                    Serial.print("dhcpMessageType opt_len ");
+                    Serial.println(opt_len);
                     type = _dhcpUdpSocket.read();
-                    break;
-                
+                    Serial.print("type: ");
+                    Serial.println(type);
+
+                    opt_len = opt_len -1;
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
+                    }                    
+
+                    break;                
                 case subnetMask :
                     opt_len = _dhcpUdpSocket.read();
-                    _dhcpUdpSocket.read(_dhcpSubnetMask, 4);
+                    Serial.print("subnetMask opt_len ");
+                    Serial.println(opt_len);
+                    _dhcpUdpSocket.read(_dhcpSubnetMask, sizeof(_dhcpSubnetMask));
+                    opt_len = opt_len - sizeof(_dhcpSubnetMask);
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
+                    }
                     break;
                 
                 case routersOnSubnet :
                     opt_len = _dhcpUdpSocket.read();
-                    _dhcpUdpSocket.read(_dhcpGatewayIp, 4);
-                    for (int i = 0; i < opt_len-4; i++)
-                    {
-                        _dhcpUdpSocket.read();
+                    Serial.print("routersOnSubnet opt_len ");
+                    Serial.println(opt_len);
+                    _dhcpUdpSocket.read(_dhcpGatewayIp, sizeof(_dhcpGatewayIp));
+                    opt_len = opt_len - sizeof(_dhcpGatewayIp);                        
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
                     }
                     break;
                 
-                case dns :
+                case dns :                    
                     opt_len = _dhcpUdpSocket.read();
-                    _dhcpUdpSocket.read(_dhcpDnsServerIp, 4);
-                    for (int i = 0; i < opt_len-4; i++)
-                    {
-                        _dhcpUdpSocket.read();
+                    Serial.print("dns opt_len ");
+                    Serial.println(opt_len);
+                    _dhcpUdpSocket.read(_dhcpDnsServerIp, sizeof(_dhcpDnsServerIp));
+                    opt_len = opt_len - sizeof(_dhcpDnsServerIp);                                            
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
                     }
+                    /*opt_len = 4;
+                    fixedMsgPtr = (uint8_t*)_dhcpDnsServerIp;
+                    while (opt_len--) {
+                        Serial.print(*fixedMsgPtr++);
+                        if( opt_len > 0 )
+                            Serial.print(".");
+                        else 
+                            Serial.println("");    
+                    }*/                    
                     break;
                 
                 case dhcpServerIdentifier :
                     opt_len = _dhcpUdpSocket.read();
-                    if( *((uint32_t*)_dhcpDhcpServerIp) == 0 || 
-                        IPAddress(_dhcpDhcpServerIp) == _dhcpUdpSocket.remoteIP() )
-                    {
+                    Serial.print("dhcpServerIdentifier opt_len ");
+                    Serial.println(opt_len);
+                    if( IPAddress(_dhcpDhcpServerIp) == IPAddress(0,0,0,0) || 
+                        IPAddress(_dhcpDhcpServerIp) == _dhcpUdpSocket.remoteIP()) {
                         _dhcpUdpSocket.read(_dhcpDhcpServerIp, sizeof(_dhcpDhcpServerIp));
+                        opt_len = opt_len - sizeof(_dhcpDhcpServerIp);
                     }
-                    else
-                    {
-                        // Skip over the rest of this option
-                        while (opt_len--)
-                        {
-                            _dhcpUdpSocket.read();
-                        }
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
                     }
                     break;
 
                 case dhcpT1value : 
                     opt_len = _dhcpUdpSocket.read();
+                    Serial.print("dhcpT1value opt_len ");
+                    Serial.println(opt_len);
                     _dhcpUdpSocket.read((uint8_t*)&_dhcpT1, sizeof(_dhcpT1));
                     _dhcpT1 = ntohl(_dhcpT1);
+                    opt_len = opt_len - sizeof(_dhcpT1);
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
+                    } 
                     break;
 
                 case dhcpT2value : 
                     opt_len = _dhcpUdpSocket.read();
+                    Serial.print("dhcpT2value opt_len ");
+                    Serial.println(opt_len);
                     _dhcpUdpSocket.read((uint8_t*)&_dhcpT2, sizeof(_dhcpT2));
                     _dhcpT2 = ntohl(_dhcpT2);
+                    opt_len = opt_len - sizeof(_dhcpT2);
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
+                    }
                     break;
 
                 case dhcpIPaddrLeaseTime :
                     opt_len = _dhcpUdpSocket.read();
+                    Serial.print("dhcpIPaddrLeaseTime opt_len ");
+                    Serial.println(opt_len);
                     _dhcpUdpSocket.read((uint8_t*)&_dhcpLeaseTime, sizeof(_dhcpLeaseTime));
                     _dhcpLeaseTime = ntohl(_dhcpLeaseTime);
-                    _renewInSec = _dhcpLeaseTime;
-                    break;
-
-                default :
-                    opt_len = _dhcpUdpSocket.read();
+                    _renewInSec = _dhcpLeaseTime;  
+                    opt_len = opt_len - sizeof(_dhcpLeaseTime);
                     // Skip over the rest of this option
-                    while (opt_len--)
-                    {
-                        _dhcpUdpSocket.read();
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
                     }
                     break;
+                default :
+                    opt_len = _dhcpUdpSocket.read();
+                    Serial.print("default opt_len ");
+                    Serial.println(opt_len);
+                    // Skip over the rest of this option
+                    while (opt_len--) {
+                        Serial.print(_dhcpUdpSocket.read());
+                        if( opt_len > 0 )
+                            Serial.print(" ");
+                        else 
+                            Serial.println("");    
+                    } 
+                    break;
             }
+            //Serial.println("_dhcpUdpSocket available");
+            //delay(1);
         }
     }
-
+    //Serial.println("_dhcpUdpSocket while");
     // Need to skip to end of the packet regardless here
     _dhcpUdpSocket.flush();
-
+    Serial.print("parseDHCPResponse type: ");
+    Serial.println(type);
     return type;
 }
 

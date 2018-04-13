@@ -61,12 +61,61 @@ UIPEthernetClass::begin(const uint8_t* mac)
 {
   static DhcpClass s_dhcp;
   _dhcp = &s_dhcp;
-
+  
   // Initialise the basic info
   init(mac);
 
   // Now try to get our config info from a DHCP server
   int ret = _dhcp->beginWithDHCP((uint8_t*)mac);
+
+  Serial.print("beginWithDHCP: ");
+  Serial.println(ret);
+
+  IPAddress printIp;
+  uint8_t i;
+  
+  printIp = _dhcp->getLocalIp();
+  Serial.print("LocalIp: ");
+  for(i=0; i<4; i++) {
+    Serial.print(printIp[i]);
+    if(i<3)
+      Serial.print(".");
+    else
+      Serial.println("");      
+  }
+
+
+  printIp = _dhcp->getDnsServerIp();
+  Serial.print("DnsServerIp: ");
+  for(i=0; i<4; i++) {
+    Serial.print(printIp[i]);
+    if(i<3)
+      Serial.print(".");
+    else
+      Serial.println("");      
+  }
+
+  printIp = _dhcp->getGatewayIp();
+  Serial.print("GatewayIp: ");
+  for(i=0; i<4; i++) {
+    Serial.print(printIp[i]);
+    if(i<3)
+      Serial.print(".");
+    else
+      Serial.println("");      
+  }
+
+  printIp = _dhcp->getSubnetMask();
+  Serial.print("SubnetMask: ");
+  for(i=0; i<4; i++) {
+    Serial.print(printIp[i]);
+    if(i<3)
+      Serial.print(".");
+    else
+      Serial.println("");      
+  }
+
+    
   if(ret == 1)
   {
     // We've successfully found a DHCP server and got our configuration info, so set things
