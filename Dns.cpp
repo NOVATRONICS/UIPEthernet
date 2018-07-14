@@ -11,10 +11,10 @@
 #include "Arduino.h"
 
 
-#define SOCKET_NONE	255
+#define SOCKET_NONE 255
 // Various flags and header field values for a DNS message
-#define UDP_HEADER_SIZE	8
-#define DNS_HEADER_SIZE	12
+#define UDP_HEADER_SIZE 8
+#define DNS_HEADER_SIZE 12
 #define TTL_SIZE        4
 #define QUERY_FLAG               (0)
 #define RESPONSE_FLAG            (1<<15)
@@ -130,7 +130,7 @@ int DNSClient::getHostByName(const char* aHostname, IPAddress& aResult)
     {
         return INVALID_SERVER;
     }
-	
+    
     // Find a socket to use
     if (iUdp.begin(1024+(millis() & 0xF)) == 1)
     {
@@ -419,4 +419,3 @@ uint16_t DNSClient::ProcessResponse(uint16_t aTimeout, IPAddress& aAddress)
     // If we get here then we haven't found an answer
     return -10;//INVALID_RESPONSE;
 }
-
